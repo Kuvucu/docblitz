@@ -123,8 +123,8 @@ function canCreate(){
 }
 function countUse(){if(!isPro())LS.set(monthKey(),usedThisMonth()+1);LS.set('seq',Math.max(LS.get('seq',0),parseInt($('number').value)||0));render()}
 
-$('pdf').onclick=()=>{if(!canCreate())return;countUse();window.print()};
-$('save').onclick=()=>{const h=LS.get('history',[]);h.unshift(snapshot());LS.set('history',h.slice(0,100));renderHistory()};
+$('pdf').onclick=()=>{if(!canCreate())return;countUse();goal('pdf');window.print()};
+$('save').onclick=()=>{goal('save');const h=LS.get('history',[]);h.unshift(snapshot());LS.set('history',h.slice(0,100));renderHistory()};
 $('newDoc').onclick=()=>{state.items=[{name:'',qty:1,price:0}];['cName','cInfo','note'].forEach(f=>$(f).value='');$('discount').value=0;$('number').value=nextNumber();$('date').valueAsDate=new Date();renderItems();render()};
 $('addItem').onclick=()=>{state.items.push({name:'',qty:1,price:0});renderItems();render()};
 document.querySelectorAll('#typeTabs button').forEach(b=>b.onclick=()=>{state.type=b.dataset.type;setTab();render()});
@@ -143,6 +143,7 @@ $('demo').onclick=fillDemo;
 
 function checkPro(){
   if(location.hash==='#pro'&&!isPro()){
+    goal('pro');
     alert('Тариф Pro скоро появится. Пока все функции доступны бесплатно — спасибо за интерес!');
     history.replaceState(null,'',location.pathname);render();
   }
