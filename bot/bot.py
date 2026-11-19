@@ -84,7 +84,7 @@ async def demo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     pdf, _ = build_pdf("invoice", 1, "ИП Петров Алексей Сергеевич\nИНН 771234567890\n"
                        "р/с 40802810000000000001, АО «Банк», БИК 044525974",
                        "ООО «Ромашка»\nИНН 7701234567", items, "none",
-                       footer=f"Пример документа из Telegram-бота @{ctx.bot.username}")
+                       footer=f"@{ctx.bot.username}")
     await update.message.reply_document(pdf, filename="Пример_счёта.pdf",
                                         caption="Так выглядит счёт. Создать свой: /new")
 
@@ -169,7 +169,7 @@ async def got_vat(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     d = ctx.user_data
     number = db.next_number(uid, d["type"])
     pro = db.is_pro(uid)
-    footer = None if pro else f"Документ создан в Telegram-боте @{ctx.bot.username}"
+    footer = None if pro else f"@{ctx.bot.username}"
     pdf, total = build_pdf(d["type"], number, db.get_seller(uid), d["client"], d["items"], vat, footer=footer)
     client_name = d["client"].splitlines()[0]
     db.save_doc(uid, d["type"], number, client_name, total)
@@ -268,9 +268,18 @@ async def post_init(app: Application):
         f"Бесплатно {FREE_LIMIT} документов в месяц. Нажмите «Запустить».")
 
 
+def _leave(handler):
+    async def run(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+        ctx.user_data.clear()
+        await handler(update, ctx)
+        return ConversationHandler.END
+    return run
+
+
 def build_app(token):
     app = Application.builder().token(token).post_init(post_init).build()
-    text = filters.TEXT & ~filters.COMMAND
+    menu = filters.Regex(f"^({BTN_NEW}|{BTN_SELLER}|{BTN_HISTORY}|{BTN_PRO})$")
+    text = filters.TEXT & ~filters.COMMAND & ~menu
     conv = ConversationHandler(
         entry_points=[CommandHandler("new", new_doc), MessageHandler(filters.Regex(f"^{BTN_NEW}$"), new_doc),
                       CommandHandler("settings", settings),
@@ -280,7 +289,11 @@ def build_app(token):
                 CLIENT: [MessageHandler(text, got_client)],
                 ITEMS: [MessageHandler(text, got_items)],
                 VAT: [CallbackQueryHandler(got_vat, pattern="^vat:")]},
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[CommandHandler("cancel", cancel),
+                   MessageHandler(filters.Regex(f"^{BTN_HISTORY}$"), _leave(history_cmd)),
+                   MessageHandler(filters.Regex(f"^{BTN_PRO}$"), _leave(pro_cmd)),
+                   CommandHandler("history", _leave(history_cmd)), CommandHandler("pro", _leave(pro_cmd)),
+                   CommandHandler("demo", _leave(demo)), CommandHandler("start", _leave(start))],
         allow_reentry=True)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(conv)
