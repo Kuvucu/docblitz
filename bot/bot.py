@@ -26,7 +26,9 @@ SELLER, TYPE, CLIENT, ITEMS, VAT = range(5)
 BTN_NEW, BTN_SELLER, BTN_HISTORY, BTN_PRO = "📄 Новый документ", "⚙️ Реквизиты", "🗂 История", "⭐ Pro"
 MENU = ReplyKeyboardMarkup([[BTN_NEW], [BTN_SELLER, BTN_HISTORY, BTN_PRO]], resize_keyboard=True)
 
-SELLER_HELP = ("Отправьте ваши реквизиты одним сообщением, каждая строка отдельно, например:\n\n"
+SELLER_HELP = ("Реквизиты — это ваши данные как исполнителя: имя или название ИП, ИНН, банковский счёт, "
+               "контакты. Они печатаются в документе, чтобы клиент знал, кому и куда платить.\n\n"
+               "Отправьте их одним сообщением, каждая строка отдельно, например:\n\n"
                "ИП Петров Алексей Сергеевич\nИНН 771234567890\n"
                "р/с 40802810000000000001, АО «Банк», БИК 044525974\n+7 900 123-45-67, petrov@mail.ru\n\n"
                "Их можно поменять в любой момент кнопкой «Реквизиты».")
@@ -96,11 +98,16 @@ async def settings(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def got_seller(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    db.set_seller(update.effective_user.id, update.message.text.strip())
+    text = update.message.text.strip()
+    db.set_seller(update.effective_user.id, text)
+    saved = (f"Запомнил ваши данные:\n\n{text}\n\nОни будут печататься в каждом документе в блоке «Исполнитель», "
+             "вводить их заново не нужно. Изменить — кнопка «Реквизиты».")
+    if len(text) < 20 or "\n" not in text:
+        saved += "\n\nСовет: добавьте ИНН и банковский счёт — без них клиенту нечем оплатить счёт."
     if ctx.user_data.pop("after_seller", False):
-        await update.message.reply_text("Реквизиты сохранены.")
+        await update.message.reply_text(saved)
         return await ask_type(update, ctx)
-    await update.message.reply_text("Реквизиты сохранены.", reply_markup=MENU)
+    await update.message.reply_text(saved, reply_markup=MENU)
     return ConversationHandler.END
 
 
