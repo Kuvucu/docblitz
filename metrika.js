@@ -1,5 +1,5 @@
 // Впишите номер счётчика Яндекс.Метрики между кавычками, например: const METRIKA_ID = '12345678';
-const METRIKA_ID = '';
+const METRIKA_ID = '114379199';
 
 function goal(name){if(METRIKA_ID&&window.ym)ym(Number(METRIKA_ID),'reachGoal',name)}
 if(METRIKA_ID){
