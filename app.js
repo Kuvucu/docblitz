@@ -116,8 +116,8 @@ function canCreate(){
   if(isPro())return true;
   if(usedThisMonth()>=FREE_LIMIT){
     $('limitBox').style.display='block';
-    $('limitBox').innerHTML=`Лимит бесплатного тарифа (${FREE_LIMIT} документов в месяц) исчерпан. <a href="#pro" id="goPro">Подключите Pro за 299 ₽/мес</a>, чтобы снять ограничения.`;
-    return false;
+    $('limitBox').innerHTML=`Вы создали больше ${FREE_LIMIT} документов в этом месяце. Скоро появится <a href="#pro" id="goPro">тариф Pro за 299 ₽/мес</a>, а пока пользуйтесь бесплатно.`;
+    return true;
   }
   return true;
 }
@@ -143,7 +143,7 @@ $('demo').onclick=fillDemo;
 
 function checkPro(){
   if(location.hash==='#pro'&&!isPro()){
-    if(confirm('Оплата Pro пока в демо-режиме. Включить Pro для теста?')){LS.set('pro',true);$('limitBox').style.display='none'}
+    alert('Тариф Pro скоро появится. Пока все функции доступны бесплатно — спасибо за интерес!');
     history.replaceState(null,'',location.pathname);render();
   }
 }
