@@ -79,18 +79,26 @@ def money(x):
     return f"{x:,.2f}".replace(",", " ").replace(".", ",") + " ₽"
 
 
-def calc(items, vat):
+_CMAP = set(pdfmetrics.getFont("DV").face.charToGlyph)
+
+
+def clean(s):
+    return "".join(ch for ch in (s or "") if ch == "\n" or (ord(ch) <= 0xFFFF and ord(ch) in _CMAP)).replace("  ", " ")
+
+
+def calc(items, vat, discount=0):
     sub = sum(i["qty"] * i["price"] for i in items)
-    vat_sum, total = 0.0, sub
+    base = sub - sub * min(max(discount, 0), 100) / 100
+    vat_sum, total = 0.0, base
     if vat == "20in":
-        vat_sum = sub * 20 / 120
+        vat_sum = base * 20 / 120
     elif vat == "20top":
-        vat_sum = sub * 0.2
-        total = sub + vat_sum
+        vat_sum = base * 0.2
+        total = base + vat_sum
     return sub, vat_sum, total
 
 
-def build_pdf(doc_type, number, seller, client, items, vat, footer=None, doc_date=None):
+def build_pdf(doc_type, number, seller, client, items, vat, footer=None, doc_date=None, discount=0, note=""):
     doc_date = doc_date or date.today()
     buf = BytesIO()
     pdf = SimpleDocTemplate(buf, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
@@ -102,7 +110,7 @@ def build_pdf(doc_type, number, seller, client, items, vat, footer=None, doc_dat
     bold = ParagraphStyle("b", parent=st, fontName="DVB")
 
     def esc(s):
-        return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
+        return clean(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
 
     story = [Paragraph(f"{TYPES[doc_type]} № {number}", h1),
              Paragraph(f"от {doc_date:%d.%m.%Y}", st), Spacer(1, 8 * mm)]
@@ -129,8 +137,10 @@ def build_pdf(doc_type, number, seller, client, items, vat, footer=None, doc_dat
     ]))
     story += [t, Spacer(1, 4 * mm)]
 
-    sub, vat_sum, total = calc(items, vat)
+    sub, vat_sum, total = calc(items, vat, discount)
     tot = [["Итого:", money(sub)]]
+    if discount:
+        tot.append([f"Скидка {discount:g}%:".replace(".", ","), "−" + money(sub * discount / 100)])
     if vat == "none":
         tot.append(["Без НДС", ""])
     else:
@@ -141,7 +151,10 @@ def build_pdf(doc_type, number, seller, client, items, vat, footer=None, doc_dat
                             ("ALIGN", (0, 0), (-1, -1), "RIGHT"), ("FONTSIZE", (0, 0), (-1, -1), 10)]))
     story += [tt, Spacer(1, 4 * mm),
               Paragraph(f"Всего наименований {len(items)}, на сумму {money(total)}", st),
-              Paragraph(amount_in_words(total), bold), Spacer(1, 14 * mm)]
+              Paragraph(amount_in_words(total), bold), Spacer(1, 6 * mm)]
+    if note:
+        story += [Paragraph(esc(note), st)]
+    story.append(Spacer(1, 8 * mm))
 
     if doc_type == "act":
         story.append(Paragraph("Вышеперечисленные услуги выполнены полностью и в срок. "

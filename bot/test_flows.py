@@ -106,12 +106,13 @@ SELLER = "ИП Петров Алексей Сергеевич\nИНН 7712345678
 
 
 async def make_doc(u, typ="invoice", client="ООО «Ромашка»\nИНН 7701234567",
-                   items="Разработка лендинга; 1; 25000\nПоддержка; 3; 3500", vat="none"):
+                   items="Разработка лендинга; 1; 25000\nПоддержка; 3; 3500", vat="none", extra=None):
     await u.text("/new")
     await u.press(f"type:{typ}")
     await u.text(client)
     await u.text(items)
-    return await u.press(f"vat:{vat}")
+    await u.press(f"vat:{vat}")
+    return await (u.text(extra) if extra else u.press("extra:skip"))
 
 
 async def flows():
@@ -159,6 +160,8 @@ async def flows():
     r = await u.text("Разработка лендинга; 1; 25 000 ₽\n\nНастройка рекламы; 12000,50\nПоддержка | 3 | 3500 руб.")
     check("Пробелы, ₽, «руб.», запятая, пустые строки, разделитель |: принимаются", "НДС?" in texts(r), texts(r))
     r = await u.press("vat:20top")
+    check("После НДС: шаг скидки и комментария с кнопкой «Пропустить»", "Пропустить" in str(r))
+    r = await u.press("extra:skip")
     txt, pages, c = pdf_text(r)
     check("Счёт с НДС сверху: PDF отправлен", c is not None)
     check("PDF: реквизиты, клиент со спецсимволами, сумма 2 позиций + НДС",
@@ -168,7 +171,8 @@ async def flows():
     check("Имя файла без запрещённых символов", c and "/" not in c["filename"] and '"' not in c["filename"], c and c["filename"])
     check("Подпись к файлу: остаток бесплатных", "Осталось бесплатных в этом месяце: 4" in c["caption"])
 
-    r = await u.press("vat:none")
+    await u.press("vat:none")
+    r = await u.press("extra:skip")
     check("Повторное нажатие старой кнопки НДС не создаёт дубль и не роняет бота",
           not any(x["m"] == "sendDocument" for x in r) and len(db.history(10)) == 1)
 
@@ -179,9 +183,11 @@ async def flows():
     txt, _, _ = pdf_text(r)
     check("Акт: свой номер № 1, две подписи, НДС в т.ч.",
           "Акт выполненных работ № 1" in txt and "Заказчик: ____" in txt and "в т.ч." in txt)
-    r = await make_doc(u, "kp")
+    r = await make_doc(u, "kp", vat="20top", extra="Скидка 10%\nСрок: 10 рабочих дней.\nПредоплата 50%.")
     txt, _, _ = pdf_text(r)
-    check("КП создаётся", "Коммерческое предложение № 1" in txt)
+    check("КП со скидкой 10% и комментарием: скидка до НДС, итог 38 340 ₽",
+          "Коммерческое предложение № 1" in txt and "Скидка 10%" in txt and "38 340,00" in txt
+          and "Срок: 10 рабочих дней." in txt and "Предоплата 50%." in txt, txt[-400:])
 
     long_items = "\n".join(f"Очень длинное название услуги номер {i} с подробным описанием работ, "
                            f"которое не помещается в одну строку таблицы; {i}; {i * 1000}" for i in range(1, 61))
@@ -229,7 +235,9 @@ async def flows():
     await u3.text("/settings")
     await u3.text("ИП Эмодзи 😀 Тестов\nИНН 1")
     r = await make_doc(u3, client="Клиент 🚀", items="Услуга ✨; 1; 1000")
-    check("Эмодзи в реквизитах и позициях: PDF создаётся без падения", pdf_text(r)[2] is not None)
+    txt, _, c = pdf_text(r)
+    check("Эмодзи вырезаются из PDF, текст остаётся", c is not None and "😀" not in txt and "ИП Эмодзи Тестов" in txt
+          and "Услуга" in txt, txt[:200])
     await app.shutdown()
 
 
@@ -251,6 +259,10 @@ def unit():
           and calc(items, "20top")[2] == 120)
     check("Дробное количество 1,5 и цена с копейками", B.parse_items("Часы; 1,5; 999,99")[0] == {"name": "Часы", "qty": 1.5, "price": 999.99})
     check("Цена 0 допускается (бесплатная позиция)", B.parse_items("Бонус; 0")[0]["price"] == 0)
+    check("Разбор доп. шага: «скидка 5,5 %» + комментарий; комментарий без скидки",
+          B.parse_extra("скидка 5,5 %\nОплата в течение 3 дней") == (5.5, "Оплата в течение 3 дней")
+          and B.parse_extra("Скидка постоянным клиентам") == (0, "Скидка постоянным клиентам"))
+    check("Скидка больше 100% ограничивается 100%", B.parse_extra("скидка 150")[0] == 100)
     pdf, _ = build_pdf("invoice", 1, "", "", [{"name": "x", "qty": 1, "price": 1}], "none")
     check("Пустые реквизиты и клиент: PDF всё равно строится", pdf.startswith(b"%PDF"))
 

@@ -21,7 +21,7 @@ PRO_DAYS = 30
 PRO_STARS = int(os.getenv("PRO_STARS", "150"))
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
-SELLER, TYPE, CLIENT, ITEMS, VAT = range(5)
+SELLER, TYPE, CLIENT, ITEMS, VAT, EXTRA = range(6)
 
 BTN_NEW, BTN_SELLER, BTN_HISTORY, BTN_PRO = "📄 Новый документ", "⚙️ Реквизиты", "🗂 История", "⭐ Pro"
 MENU = ReplyKeyboardMarkup([[BTN_NEW], [BTN_SELLER, BTN_HISTORY, BTN_PRO]], resize_keyboard=True)
@@ -164,21 +164,53 @@ async def got_items(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def got_vat(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    vat = q.data.split(":")[1]
+    ctx.user_data["vat"] = q.data.split(":")[1]
+    await q.edit_message_text("НДС: " + {"none": "без НДС", "20in": "20% включён", "20top": "20% сверху"}[ctx.user_data["vat"]])
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("Пропустить", callback_data="extra:skip")]])
+    await q.message.reply_text(
+        "Скидка и комментарий — по желанию. Отправьте одним сообщением, например:\n\n"
+        "<code>скидка 5\nСрок выполнения: 10 рабочих дней. Предоплата 50%.</code>\n\n"
+        "Или нажмите «Пропустить».", parse_mode="HTML", reply_markup=kb)
+    return EXTRA
+
+
+def parse_extra(text):
+    discount, note = 0.0, []
+    for line in text.strip().splitlines():
+        m = re.fullmatch(r"\s*скидка\s*(\d+(?:[.,]\d+)?)\s*%?\s*", line, re.I)
+        if m and not discount:
+            discount = min(float(m.group(1).replace(",", ".")), 100)
+        else:
+            note.append(line)
+    return discount, "\n".join(note).strip()
+
+
+async def got_extra(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    ctx.user_data["discount"], ctx.user_data["note"] = parse_extra(update.message.text)
+    return await finish(update.message, update, ctx)
+
+
+async def skip_extra(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    await q.edit_message_text("Без скидки и комментария.")
+    return await finish(q.message, update, ctx)
+
+
+async def finish(msg, update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     d = ctx.user_data
     number = db.next_number(uid, d["type"])
     pro = db.is_pro(uid)
     footer = None if pro else f"@{ctx.bot.username}"
-    pdf, total = build_pdf(d["type"], number, db.get_seller(uid), d["client"], d["items"], vat, footer=footer)
+    pdf, total = build_pdf(d["type"], number, db.get_seller(uid), d["client"], d["items"], d["vat"],
+                           footer=footer, discount=d.get("discount", 0), note=d.get("note", ""))
     client_name = d["client"].splitlines()[0]
     db.save_doc(uid, d["type"], number, client_name, total)
-    await q.edit_message_text("Готово!")
     fname = f"{TYPES[d['type']]} №{number} {client_name}.pdf".replace("/", "-").replace('"', "")
     left = "" if pro else f"\nОсталось бесплатных в этом месяце: {max(FREE_LIMIT - db.used_this_month(uid), 0)}"
-    await q.message.reply_document(pdf, filename=fname,
-                                   caption=f"{TYPES[d['type']]} № {number} на {money(total)}{left}",
-                                   reply_markup=MENU)
+    await msg.reply_document(pdf, filename=fname, caption=f"{TYPES[d['type']]} № {number} на {money(total)}{left}",
+                             reply_markup=MENU)
     d.clear()
     return ConversationHandler.END
 
@@ -289,7 +321,8 @@ def build_app(token, bot=None):
                 TYPE: [CallbackQueryHandler(got_type, pattern="^type:")],
                 CLIENT: [MessageHandler(text, got_client)],
                 ITEMS: [MessageHandler(text, got_items)],
-                VAT: [CallbackQueryHandler(got_vat, pattern="^vat:")]},
+                VAT: [CallbackQueryHandler(got_vat, pattern="^vat:")],
+                EXTRA: [MessageHandler(text, got_extra), CallbackQueryHandler(skip_extra, pattern="^extra:skip$")]},
         fallbacks=[CommandHandler("cancel", cancel),
                    MessageHandler(filters.Regex(f"^{BTN_HISTORY}$"), _leave(history_cmd)),
                    MessageHandler(filters.Regex(f"^{BTN_PRO}$"), _leave(pro_cmd)),
