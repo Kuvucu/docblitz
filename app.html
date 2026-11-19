@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Генератор документов — DocBlitz</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="nav"><div class="container">
+  <a class="logo" href="index.html">Doc<span>Blitz</span></a>
+  <span id="planBadge" class="no-print" style="color:var(--muted);font-size:14px"></span>
+</div></header>
+
+<div class="container app">
+  <aside class="sidebar">
+    <div class="panel">
+      <div class="tabs" id="typeTabs">
+        <button data-type="kp" class="active">КП</button>
+        <button data-type="invoice">Счёт</button>
+        <button data-type="act">Акт</button>
+      </div>
+      <div class="row">
+        <div><label>Номер</label><input id="number"></div>
+        <div><label>Дата</label><input id="date" type="date"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Ваши реквизиты <span style="font-weight:400;color:var(--muted);font-size:12px">(сохраняются)</span></h3>
+      <label>Название / ФИО</label><input id="sName" placeholder="ИП Иванов Иван Иванович">
+      <div class="row">
+        <div><label>ИНН</label><input id="sInn"></div>
+        <div><label>Телефон</label><input id="sPhone"></div>
+      </div>
+      <label>Email</label><input id="sEmail">
+      <label>Банковские реквизиты</label><textarea id="sBank" rows="2" placeholder="р/с ..., банк ..., БИК ..."></textarea>
+      <label>Логотип</label><input id="logo" type="file" accept="image/*">
+      <button class="btn ghost" id="removeLogo" type="button">Убрать логотип</button>
+    </div>
+
+    <div class="panel">
+      <h3>Клиент</h3>
+      <label>Название / ФИО</label><input id="cName" placeholder="ООО «Ромашка»">
+      <label>ИНН / контакты</label><input id="cInfo">
+    </div>
+
+    <div class="panel">
+      <h3>Позиции</h3>
+      <div class="item" style="font-size:12px;color:var(--muted)"><span>Наименование</span><span>Кол-во</span><span>Цена, ₽</span><span></span></div>
+      <div id="items"></div>
+      <button class="btn secondary" id="addItem" type="button">+ Добавить позицию</button>
+      <div class="row" style="margin-top:10px">
+        <div><label>НДС</label>
+          <select id="vat"><option value="none">Без НДС</option><option value="20in">НДС 20% (в т.ч.)</option><option value="20top">НДС 20% (сверху)</option></select></div>
+        <div><label>Скидка, %</label><input id="discount" type="number" min="0" max="100" value="0"></div>
+      </div>
+      <label>Комментарий / условия</label><textarea id="note" rows="3" placeholder="Срок выполнения: 5 рабочих дней. Предоплата 50%."></textarea>
+    </div>
+  </aside>
+
+  <main>
+    <div class="toolbar no-print">
+      <button class="btn" id="pdf">Скачать PDF</button>
+      <button class="btn secondary" id="save">Сохранить в историю</button>
+      <button class="btn ghost" id="newDoc">Новый документ</button>
+      <button class="btn ghost" id="demo">Заполнить пример</button>
+    </div>
+    <div id="limitBox" class="limit no-print" style="display:none"></div>
+    <div class="doc" id="doc"></div>
+    <div class="panel no-print" style="margin-top:16px">
+      <h3>История документов</h3>
+      <div id="history"></div>
+    </div>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
