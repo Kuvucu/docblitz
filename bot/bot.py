@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, ReplyKeyboardMarkup,
+from telegram import (BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, ReplyKeyboardMarkup,
                       Update)
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler, ContextTypes,
                           ConversationHandler, MessageHandler, PreCheckoutQueryHandler, filters)
@@ -249,8 +249,20 @@ async def stats_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"Пользователей: {s['users']}\nДокументов: {s['docs']}\nPro сейчас: {s['pro']}\nЗвёзд получено: {s['stars']}")
 
 
+async def post_init(app: Application):
+    await app.bot.set_my_commands([
+        BotCommand("new", "Новый документ"), BotCommand("settings", "Мои реквизиты"),
+        BotCommand("history", "История документов"), BotCommand("demo", "Пример PDF"),
+        BotCommand("pro", "Тариф Pro"), BotCommand("paysupport", "Вопросы по оплате"),
+        BotCommand("help", "Помощь")])
+    await app.bot.set_my_short_description("КП, счета и акты в PDF за минуту. Сумма прописью, НДС, история.")
+    await app.bot.set_my_description(
+        "Создаю коммерческие предложения, счета на оплату и акты выполненных работ в PDF.\n\n"
+        f"Бесплатно {FREE_LIMIT} документов в месяц. Нажмите «Запустить».")
+
+
 def build_app(token):
-    app = Application.builder().token(token).build()
+    app = Application.builder().token(token).post_init(post_init).build()
     text = filters.TEXT & ~filters.COMMAND
     conv = ConversationHandler(
         entry_points=[CommandHandler("new", new_doc), MessageHandler(filters.Regex(f"^{BTN_NEW}$"), new_doc),
