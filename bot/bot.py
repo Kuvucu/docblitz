@@ -276,8 +276,9 @@ def _leave(handler):
     return run
 
 
-def build_app(token):
-    app = Application.builder().token(token).post_init(post_init).build()
+def build_app(token, bot=None):
+    builder = Application.builder().bot(bot) if bot else Application.builder().token(token)
+    app = builder.post_init(post_init).build()
     menu = filters.Regex(f"^({BTN_NEW}|{BTN_SELLER}|{BTN_HISTORY}|{BTN_PRO})$")
     text = filters.TEXT & ~filters.COMMAND & ~menu
     conv = ConversationHandler(

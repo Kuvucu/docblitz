@@ -1,9 +1,10 @@
+import os
 import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
 
-DB = sqlite3.connect(Path(__file__).parent / "bot.db", check_same_thread=False)
+DB = sqlite3.connect(os.getenv("DOCBLITZ_DB") or Path(__file__).parent / "bot.db", check_same_thread=False)
 DB.executescript("""
 CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, seller TEXT, pro_until REAL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS docs(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, type TEXT,
